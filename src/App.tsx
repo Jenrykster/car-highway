@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import "./App.css";
 import { Canvas, useFrame } from "@react-three/fiber";
 import {
   CatmullRomCurve3,
+  Color,
   Mesh,
   MeshStandardMaterial,
   Shape,
@@ -10,102 +11,61 @@ import {
   Vector2,
   Vector3,
 } from "three";
+import StaticRoad from "./elements/Road";
+import Car from "./elements/Car";
 
-const Road = ({
-  width = 10,
-  length = 100,
-  color = "gray",
-  pos = [0, 0, -100],
-}) => {
-  const mesh = useRef<Mesh>(null);
+function RoadManager() {
   const roadRef = useRef<Mesh>();
-  const spotLightRef = useRef<SpotLight>();
-  const pts1 = [],
-    count = 3;
-
-  for (let i = 0; i < count; i++) {
-    const l = width;
-
-    const a = ((2 * i) / count) * Math.PI;
-
-    pts1.push(new Vector2(Math.cos(a) * l, Math.sin(a) * l));
-  }
-
-  const shape = new Shape(pts1);
-
+  const roadBackRef = useRef<Mesh>();
   const closedSpline = new CatmullRomCurve3(
     [
-      new Vector3(0, 0, 0),
+      new Vector3(0, -20, 0),
+      new Vector3(10, 0, 0),
       new Vector3(0, 30, 0),
       new Vector3(20, 60, 0),
       new Vector3(20, 100, 0),
+      new Vector3(20, 190, 4),
     ],
 
     false,
     "catmullrom"
   );
 
-  const settings = {
-    steps: 100,
-    bevelEnabled: false,
-    extrudePath: closedSpline,
-  };
-
-  let carPosition = 0;
-  const carSpeed = 0.005;
-  useFrame(() => {
-    if (mesh.current && roadRef.current) {
-      const currPoint = closedSpline.getPoint(carPosition % 1);
-      const nextPoint = closedSpline.getPointAt((carPosition + carSpeed) % 1);
-
-      const newPos = currPoint.applyMatrix4(roadRef.current.matrixWorld);
-      const newNextPos = nextPoint.applyMatrix4(roadRef.current.matrixWorld);
-
-      newPos.add(new Vector3(0, 7.5, 0));
-      newNextPos.add(new Vector3(0, 7.5, 0));
-
-      mesh.current.position.copy(newPos);
-      mesh.current.lookAt(newNextPos);
-
-      mesh.current.rotation.z = 0;
-      spotLightRef.current?.target.position.copy(newNextPos);
-      spotLightRef.current?.target.updateMatrixWorld();
-      carPosition += carSpeed;
+  const carFleet = (size: number) => {
+    const cars = [];
+    for (let i = 0; i < size; i++) {
+      const isOppositeDirection = Math.random() > 0.5;
+      const roadMatrix = isOppositeDirection
+        ? roadBackRef.current?.matrixWorld
+        : roadRef.current?.matrixWorld;
+      const col = Math.random() * 0.1;
+      cars.push(
+        <Car
+          key={i}
+          color={new Color(col, col, col)}
+          speedOffset={Math.random() + 0.75}
+          xOffset={Math.random() * 5}
+          roadMatrixTransform={roadMatrix}
+          roadPath={closedSpline}
+          oppositeDirection={isOppositeDirection}
+        />
+      );
     }
-  });
-
-  console.log(spotLightRef);
+    return cars;
+  };
 
   return (
     <>
-      <mesh ref={mesh}>
-        <spotLight ref={spotLightRef} color="white" position={[0, 0, 0]} />
-        <boxGeometry args={[1.5, 1, 2]} />
-        <meshStandardMaterial color="blue" />
-      </mesh>
-      <mesh ref={roadRef} position={pos} rotation={[-1, 0, 1.25]}>
-        <extrudeGeometry args={[shape, settings]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
+      <StaticRoad deepness={5} width={10} ref={roadRef} path={closedSpline} />
+      <StaticRoad
+        back
+        deepness={5}
+        width={15}
+        ref={roadBackRef}
+        path={closedSpline}
+      />
+      {carFleet(100)}
     </>
-  );
-};
-
-function Box() {
-  const mesh = useRef<Mesh>(null);
-  const material = useRef<MeshStandardMaterial>(null);
-  useFrame(() => {
-    if (mesh.current) {
-      mesh.current.rotation.x += 0.1;
-      mesh.current.rotation.z += 0.01;
-      mesh.current.rotation.y += 0.05;
-    }
-  });
-  return (
-    <mesh ref={mesh} position={[0, 30, -90]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="blue" ref={material} />
-    </mesh>
   );
 }
 
@@ -117,12 +77,11 @@ function App() {
         height: "80vh",
       }}
     >
-      <Canvas color="white" camera={{}}>
+      <Canvas color="white">
         <color attach="background" args={["#080705"]} />
         <ambientLight intensity={0.1} />
-        <Box />
         <pointLight position={[10, 10, 10]} intensity={0.1} />
-        <Road pos={[30, -5, -40]} />
+        <RoadManager />
       </Canvas>
     </div>
   );
